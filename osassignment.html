@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CPU Scheduling Simulator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google Font (Different from earlier) -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: #1e1e2f;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .wrapper {
+            width: 95%;
+            max-width: 1100px;
+        }
+
+        .card {
+            background: #2b2b40;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 8px 8px 15px #141420,
+                        -8px -8px 15px #32324d;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+
+        .inputs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        input, select {
+            padding: 10px;
+            border-radius: 12px;
+            border: none;
+            outline: none;
+            background: #1e1e2f;
+            color: white;
+            box-shadow: inset 4px 4px 6px #141420,
+                        inset -4px -4px 6px #32324d;
+        }
+
+        button {
+            padding: 10px 18px;
+            border-radius: 12px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.3s ease;
+        }
+
+        .add-btn {
+            background: #4e9af1;
+            color: white;
+        }
+
+        .add-btn:hover {
+            background: #3b7ed0;
+        }
+
+        .simulate-btn {
+            background: #00c896;
+            color: black;
+        }
+
+        .simulate-btn:hover {
+            background: #00a87f;
+        }
+
+        .reset-btn {
+            background: #ff5c5c;
+            color: white;
+        }
+
+        .reset-btn:hover {
+            background: #e04848;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background: #24243a;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+        }
+
+        th {
+            background: #32324d;
+        }
+
+        tr:nth-child(even) {
+            background: #2f2f47;
+        }
+
+        .gantt-container {
+            margin-top: 30px;
+        }
+
+        .gantt {
+            display: flex;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .block {
+            margin-right: 4px;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 500;
+            position: relative;
+            min-width: 50px;
+            transition: 0.3s;
+        }
+
+        .block:hover {
+            transform: translateY(-5px);
+        }
+
+        .idle {
+            background: #777;
+        }
+
+        .time {
+            position: absolute;
+            bottom: -22px;
+            left: 0;
+            font-size: 12px;
+        }
+
+        .avg {
+            margin-top: 25px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .error {
+            text-align: center;
+            color: #ff6b6b;
+            margin-top: 10px;
+        }
+
+        @media(max-width: 600px){
+            .inputs {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="wrapper">
+    <div class="card">
+        <h2>CPU Scheduling Simulator</h2>
+
+        <div class="inputs">
+            <input type="text" id="pid" placeholder="Process ID">
+            <input type="number" id="arrival" placeholder="Arrival Time" min="0">
+            <input type="number" id="burst" placeholder="Burst Time" min="1">
+            <button class="add-btn" onclick="addProcess()">Add</button>
+
+            <select id="algorithm">
+                <option value="FCFS">FCFS</option>
+                <option value="SJF">SJF</option>
+            </select>
+
+            <button class="simulate-btn" onclick="simulate()">Simulate</button>
+            <button class="reset-btn" onclick="resetAll()">Reset</button>
+        </div>
+
+        <p class="error" id="error"></p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>PID</th>
+                    <th>Arrival</th>
+                    <th>Burst</th>
+                    <th>Waiting</th>
+                    <th>Turnaround</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+
+        <div class="gantt-container">
+            <div class="gantt" id="ganttChart"></div>
+        </div>
+
+        <div class="avg" id="average"></div>
+    </div>
+</div>
+
+<script>
+let processes = [];
+const colors = ["#4e9af1", "#ff7b54", "#9b5de5", "#00c896", "#f15bb5"];
+
+function addProcess() {
+    const pid = document.getElementById("pid").value.trim();
+    const arrival = parseInt(document.getElementById("arrival").value);
+    const burst = parseInt(document.getElementById("burst").value);
+    const error = document.getElementById("error");
+
+    if (pid === "" || isNaN(arrival) || isNaN(burst) || arrival < 0 || burst <= 0) {
+        error.textContent = "Enter valid inputs!";
+        return;
+    }
+
+    error.textContent = "";
+
+    processes.push({ pid, arrival, burst });
+
+    document.getElementById("pid").value = "";
+    document.getElementById("arrival").value = "";
+    document.getElementById("burst").value = "";
+
+    displayTable();
+}
+
+function displayTable() {
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = "";
+
+    processes.forEach(p => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${p.pid}</td>
+                <td>${p.arrival}</td>
+                <td>${p.burst}</td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
+        `;
+    });
+}
+
+function simulate() {
+    if (processes.length === 0) return;
+
+    let sorted = [...processes];
+    sorted.sort((a, b) => a.arrival - b.arrival);
+
+    let time = 0;
+    let totalWaiting = 0;
+
+    const gantt = document.getElementById("ganttChart");
+    gantt.innerHTML = "";
+
+    sorted.forEach((p, index) => {
+
+        if (time < p.arrival) {
+            gantt.appendChild(createBlock("Idle", time, p.arrival, true));
+            time = p.arrival;
+        }
+
+        let start = time;
+        let completion = start + p.burst;
+
+        p.waiting = start - p.arrival;
+        p.turnaround = completion - p.arrival;
+
+        totalWaiting += p.waiting;
+
+        gantt.appendChild(createBlock(p.pid, start, completion, false, colors[index % colors.length]));
+        time = completion;
+    });
+
+    updateTable(sorted, totalWaiting);
+}
+
+function createBlock(label, start, end, idle, color) {
+    let div = document.createElement("div");
+    div.className = idle ? "block idle" : "block";
+    div.style.width = (end - start) * 45 + "px";
+    if (!idle) div.style.background = color;
+    div.innerHTML = `${label}<div class="time">${start}</div>`;
+    return div;
+}
+
+function updateTable(sorted, totalWaiting) {
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = "";
+
+    sorted.forEach(p => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${p.pid}</td>
+                <td>${p.arrival}</td>
+                <td>${p.burst}</td>
+                <td>${p.waiting}</td>
+                <td>${p.turnaround}</td>
+            </tr>
+        `;
+    });
+
+    document.getElementById("average").textContent =
+        "Average Waiting Time: " + (totalWaiting / sorted.length).toFixed(2);
+}
+
+function resetAll() {
+    processes = [];
+    document.getElementById("tableBody").innerHTML = "";
+    document.getElementById("ganttChart").innerHTML = "";
+    document.getElementById("average").textContent = "";
+    document.getElementById("error").textContent = "";
+}
+</script>
+
+</body>
+</html>
